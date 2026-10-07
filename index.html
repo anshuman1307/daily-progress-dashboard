@@ -138,53 +138,72 @@ async function loadGoogleData(){
  loading(true,'Reading Google Sheet…');
  $('xlstatus').textContent='Reading OPD / EMR data from Google Sheets…';
  try{
-  if(typeof XLSX==='undefined') throw new Error('Data reader could not be loaded. Check your internet connection.');
   const urls={
    opd:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ4dAcE7glYk2PAtd47gNP_Yi7y_rL5jvD6mqEmLvkZV1skWQ14LrW1_zt79BueFK5CbNnuiWm8zz4/pub?gid=2055927213&single=true&output=csv',
    emr:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ4dAcE7glYk2PAtd47gNP_Yi7y_rL5jvD6mqEmLvkZV1skWQ14LrW1_zt79BueFK5CbNnuiWm8zz4/pub?gid=1693021498&single=true&output=csv'
   };
-  const norm=x=>String(x??'').trim().toLowerCase();
+  const norm=x=>String(x??'').replace(/^\uFEFF/,'').trim().toLowerCase();
+  const csvRows=text=>{
+   const out=[]; let row=[], field='', quoted=false;
+   for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(quoted){
+     if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else quoted=false; }
+     else field+=c;
+    }else{
+     if(c==='"') quoted=true;
+     else if(c===','){row.push(field);field='';}
+     else if(c==='\n'){row.push(field.replace(/\r$/,''));out.push(row);row=[];field='';}
+     else field+=c;
+    }
+   }
+   if(field!==''||row.length){row.push(field.replace(/\r$/,''));out.push(row);}
+   return out;
+  };
   const find=(obj,names)=>{for(const k of Object.keys(obj)){if(names.includes(norm(k))) return obj[k];} return '';};
   const date=x=>{
-   if(x instanceof Date && !isNaN(x)) return x.toISOString().slice(0,10);
-   if(x==='' || x==null) return null;
-   const d=new Date(x); if(!isNaN(d)) return d.toISOString().slice(0,10);
-   const m=String(x).match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-   return String(x);
+   if(x===''||x==null)return null;
+   const v=String(x).trim();
+   let m=v.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+   if(m){let y=Number(m[3]);if(y<100)y+=2000;return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;}
+   m=v.match(/^(\d{1,2})[- ]([A-Za-z]{3})[- ](\d{2,4})$/);
+   if(m){const d=new Date(`${m[1]} ${m[2]} ${m[3]}`);if(!isNaN(d))return d.toISOString().slice(0,10);}
+   const d=new Date(v);return isNaN(d)?v:d.toISOString().slice(0,10);
   };
-  const num=x=>{const n=Number(x); return Number.isFinite(n)?n:0};
+  const num=x=>{const n=Number(String(x??'').replace(/,/g,''));return Number.isFinite(n)?n:0};
   const next={};
   for(const key of ['opd','emr']){
    const res=await fetch(urls[key],{cache:'no-store'});
-   if(!res.ok) throw new Error(`${key.toUpperCase()} data could not be loaded (${res.status}).`);
-   const csv=await res.text();
-   const wb=XLSX.read(csv,{type:'string',cellDates:true});
-   const ws=wb.Sheets[wb.SheetNames[0]];
-   if(!ws) throw new Error(`${key.toUpperCase()} sheet returned no data.`);
-   const matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
+   if(!res.ok)throw new Error(`${key.toUpperCase()} data could not be loaded (${res.status}).`);
+   const text=await res.text();
+   const matrix=csvRows(text);
    const headerIndex=matrix.findIndex(row=>row.some(v=>norm(v)==='activity'));
-   if(headerIndex<0) throw new Error(`${key.toUpperCase()} data could not be read: ACTIVITY header not found.`);
+   if(headerIndex<0)throw new Error(`${key.toUpperCase()} data could not be read: ACTIVITY header not found.`);
    const headers=matrix[headerIndex].map(v=>String(v??'').trim());
-   const rows=matrix.slice(headerIndex+1).map(row=>Object.fromEntries(headers.map((h,i)=>[h,row[i]??''])));
-   next[key]={name:key==='opd'?'OPD Building':'Emergency Building',rows:rows.map((r,i)=>({
-    i,g:String(find(r,['section','group','work package'])).trim(),n:String(find(r,['activity','name'])).trim(),u:String(find(r,['unit','u'])).trim(),
-    sc:num(find(r,['target','scope','sc'])),d:num(find(r,['done','done to date','progress','d'])),s:date(find(r,['start','start date','s'])),e:date(find(r,['end','end date','finish','finish date','e'])),
-    mn:num(find(r,['manpower available','available manpower','mn'])),ma:num(find(r,['manpower needed','required manpower','ma']))
-   })).filter(r=>r.n && r.sc!==0)};
+   const rows=[]; let section='';
+   for(const row of matrix.slice(headerIndex+1)){
+    const r=Object.fromEntries(headers.map((h,i)=>[h,row[i]??'']));
+    const activity=String(find(r,['activity','name'])).trim();
+    const scopeRaw=find(r,['target','scope','sc']);
+    const scope=num(scopeRaw);
+    const hasWorkValues=scope!==0 || String(find(r,['done','achieved','progress','d'])).trim()!=='' || String(find(r,['start','plan / actual start','start date','s'])).trim()!=='';
+    if(!activity && !hasWorkValues)continue;
+    if(!activity)continue;
+    // Category rows such as Structure / Finishes / MEP are kept as grouping labels.
+    if(scope===0 && !find(r,['start','plan / actual start','start date','s']) && !find(r,['done','achieved','progress','d']) && !find(r,['target','scope','sc'])){section=activity;continue;}
+    const g=section;
+    rows.push({i:rows.length,g,n:activity,u:String(find(r,['unit','u'])).trim(),sc:scope,d:num(find(r,['done','achieved','achieved as on 3rd oct','progress','d'])),s:date(find(r,['start','plan / actual start','start date','s'])),e:date(find(r,['end','target date','finish','finish date','e'])),mn:num(find(r,['manpower needed','required manpower','mn'])),ma:num(find(r,['manpower available','available manpower','ma']))});
+   }
+   next[key]={name:key==='opd'?'OPD Building':'Emergency Building',rows};
   }
-  if(!next.opd || !next.emr || !next.opd.rows.length || !next.emr.rows.length) throw new Error('OPD or EMR data is empty. Check the published Google Sheet tabs.');
-  loading(true,'Generating dashboard…');
-  await new Promise(r=>setTimeout(r,60));
-  D=next; cur='opd'; ai=null; fs='Active'; sel=TODAY<'2026-10-04'?'2026-10-04':TODAY;
+  if(!next.opd.rows.length||!next.emr.rows.length)throw new Error(`OPD or EMR data is empty. Parsed ${next.opd.rows.length} OPD and ${next.emr.rows.length} EMR activities.`);
+  loading(true,'Generating dashboard…'); await new Promise(r=>setTimeout(r,60));
+  D=next;cur='opd';ai=null;fs='Active';sel=TODAY<'2026-10-04'?'2026-10-04':TODAY;
   const refreshed=new Date().toLocaleString('en-GB',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
   $('xlstatus').textContent=`Updated ${refreshed} · ${D.opd.rows.length} OPD + ${D.emr.rows.length} EMR activities`;
-  render();
-  $('downloadBtn').disabled=false;
- }catch(e){
-  console.error(e);
-  $('xlstatus').textContent='Could not load Google Sheet data: '+e.message;
-  toast('Google Sheet data could not be loaded');
- }finally{loading(false)}
+  $('downloadBtn').disabled=false; render(); toast('Google Sheet data loaded');
+ }catch(e){console.error(e);$('xlstatus').textContent=e.message||'Could not load Google Sheet data.';toast(e.message||'Could not load Google Sheet data.');}
+ finally{loading(false)}
 }
 function downloadDashboard(){
  if(!Object.keys(D).length)return;
