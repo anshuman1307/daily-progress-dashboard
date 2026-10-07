@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+<title>Daily Site Progress Tracker – OPD / EMR</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f3efe8;--card:#fff;--ink:#23211d;--mute:#7a746a;--line:#e0d9cc;--acc:#e8590c;--ok:#2f9e44;--warn:#f08c00;--bad:#d6336c;--up:#868e96;--track:#e9e3d6}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1916;--card:#25231f;--ink:#f1ece2;--mute:#9a9385;--line:#38342d;--track:#38342d}}
+:root[data-theme="dark"]{--bg:#1a1916;--card:#25231f;--ink:#f1ece2;--mute:#9a9385;--line:#38342d;--track:#38342d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 'IBM Plex Sans',system-ui,sans-serif}
+.w{max-width:1280px;margin:0 auto;padding:16px}
+h1,.big{font-family:'Barlow Condensed','Arial Narrow',sans-serif;text-transform:uppercase;letter-spacing:.02em}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;border-bottom:4px solid var(--acc);padding-bottom:10px}
+h1{margin:0;font-size:34px;line-height:1}.sub{color:var(--mute);font-size:12px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--up)}.live.on .dot{background:var(--ok);animation:p 1.6s infinite}@keyframes p{50%{opacity:.3}}
+.bar0{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0}
+button,input[type=date]{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 14px;font:600 13px 'IBM Plex Sans',sans-serif;cursor:pointer;border-radius:4px}
+button.a{background:var(--ink);color:var(--bg);border-color:var(--ink)}button.sm{padding:4px 10px;font-size:12px}
+.k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px}
+.l{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}.v{font-size:36px;line-height:1.1}
+.ch{display:flex;align-items:flex-end;gap:6px;height:90px;margin-top:8px;overflow-x:auto}
+.ch div{flex:1;min-width:34px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:10px;color:var(--mute)}
+.ch i{display:block;width:100%;background:var(--acc);border-radius:2px 2px 0 0}
+.f{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 8px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:980px}
+th{font-size:11px;text-align:left;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;padding:6px;border-bottom:2px solid var(--line)}
+td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:middle}td small{display:block;color:var(--mute);font-size:11px}
+.bar{position:relative;height:7px;background:var(--track);border-radius:2px;margin-top:3px;width:90px}.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:2px}
+input[type=number]{width:78px;padding:4px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:3px;font:600 13px 'IBM Plex Sans',sans-serif;text-align:right}
+.s{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
+.G{background:var(--ok)}.A{background:var(--warn)}.R{background:var(--bad)}.N{background:var(--up)}
+.neg{color:var(--bad);font-weight:600}.pos{color:var(--ok)}
+svg{display:block}svg text{fill:var(--mute);font-size:10px}.gr{stroke:var(--line)}.ln{fill:none;stroke-width:2.2}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}@media(max-width:820px){.two{grid-template-columns:1fr}}
+.pw{border-left:4px solid var(--acc)}a.an{cursor:pointer;text-decoration:underline dotted}
+.gb{margin-bottom:9px}.gb>div:first-child{display:flex;justify-content:space-between;font-size:12px;font-weight:600}
+.hm{border-collapse:collapse;font-size:11px;min-width:0;width:auto}.hm th{font-size:10px;padding:2px;text-align:center}.hm td{padding:0;border:0}
+.hm td.x{min-width:38px;height:24px;text-align:center;color:#fff;font-weight:600;border:2px solid var(--card);border-radius:4px}.hm td.n{background:var(--track)}
+#t{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:4px;display:none;font-size:13px}
+.loader{position:fixed;inset:0;background:rgba(243,239,232,.82);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(2px)}
+.loader.show{display:flex}.loaderbox{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:22px 28px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.12);min-width:250px}.spinner{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 12px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.loadertext{font-weight:600}.loaderhint{margin-top:4px;font-size:12px;color:var(--mute)}
+
+</style></head><body><div class="w">
+<header><div><h1>Daily Site Progress Tracker</h1><div class="sub" id="asof"></div><div class="sub" id="generatedAt"></div></div>
+<div class="live" id="live"><span class="dot"></span><span id="lt">Local only</span></div></header>
+<div class="bar0"><button id="refreshBtn" class="sm a" onclick="loadGoogleData()">Refresh Data</button><span id="xlstatus" class="sub">Loading OPD / EMR data from Google Sheets…</span><button id="downloadBtn" class="sm" onclick="downloadDashboard()" disabled>Download Dashboard</button><span style="flex:1"></span>
+<button class="sm" onclick="mv(-1)">◀</button><input type="date" id="dt" onchange="sd(this.value)"><button class="sm" onclick="mv(1)">▶</button><button class="sm" onclick="sd(TODAY)">Today</button></div>
+<div id="tabs" class="bar0" style="margin-top:12px"></div>
+<div class="k" id="k"></div>
+<div class="c" style="margin-top:12px"><div class="l">Daily scorecard — % of logged activities that met the asking rate (last 14 days with entries)</div><div class="ch" id="ch"></div></div>
+<div class="two"><div class="c"><div class="l">Overall % complete — actual vs plan</div><div id="tr"></div></div><div class="c"><div class="l" style="margin-bottom:8px">Work packages — actual vs planned for selected day</div><div id="gp"></div></div></div>
+<div class="c pw" id="dp" style="display:none;margin-top:12px"></div>
+<div class="f" id="f"></div>
+<div class="c" id="tc"><div class="tw"><table><thead><tr><th>Activity</th><th>Done to date</th><th>Balance</th><th>Asking / day</th><th>Output on selected day</th><th>7-day avg</th><th>Forecast finish</th><th>Workmen avail / need</th><th>Status</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+<div class="c" id="mx" style="display:none"><div class="l" style="margin-bottom:8px">Daily progress matrix — output per activity per day (green ≥ asking rate · amber ≥ 70% · red below · grey not logged). Click an activity for its charts.</div><div class="tw" id="mxb"></div></div>
+<div class="sub" style="margin-top:10px">Baseline = quantities achieved as on 3 Oct 2026 (Book1.xlsx). Enter each day's output for an activity; progress, balance, asking rate (balance ÷ days left to target) and forecast update instantly for everyone viewing. Activities tracked only as % are logged in percentage points.</div>
+</div><div id="t"></div>
+<div id="loader" class="loader" aria-live="polite"><div class="loaderbox"><div class="spinner"></div><div id="loadertext" class="loadertext">Reading Excel…</div><div id="loaderhint" class="loaderhint">Please wait while the dashboard is generated.</div></div></div>
+<script>
+let D={};const GENERATED_AT='';const BASE='2026-10-03',DAY=864e5,TODAY=new Date(new Date()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const FL=['Active','Below rate','Upcoming','Done','All'];
+let cur='opd',fs='Active',view='tb',ai=null,sel=TODAY<'2026-10-04'?'2026-10-04':TODAY;const LG={opd:{},emr:{}},tm={};
+const $=id=>document.getElementById(id),dd=s=>new Date(s+'T00:00:00'),iso=x=>new Date(x-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const f1=x=>x>=100?Math.round(x).toLocaleString():(Math.round(x*10)/10).toString();
+const fm=s=>dd(s).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+function toast(m){const t=$('t');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2400)}
+function loading(on,msg='Reading Excel…'){const l=$('loader');$('loadertext').textContent=msg;l.classList.toggle('show',on);$('refreshBtn').disabled=on;$('downloadBtn').disabled=on||!Object.keys(D).length}
+const q=(r,date)=>LG[cur][date]?.[r.i];
+function before(r,date){let s=r.d;for(const k in LG[cur])if(k<date&&LG[cur][k][r.i]!=null)s+=LG[cur][k][r.i];return s}
+function ask(r,date){const e=dd(r.e),dl=Math.max(1,Math.ceil((e-dd(date))/DAY));return Math.max(0,r.sc-before(r,date))/dl}
+function avg(r){let s=0,n=0;for(let i=0;i<7;i++){const k=iso(dd(sel)-i*DAY),x=LG[cur][k];if(x&&Object.keys(x).length){n++;s+=x[r.i]||0}}return n?s/n:null}
+function info(r){const cum=before(r,'9999')>=0?before(r,'9999'):r.d,bal=Math.max(0,r.sc-cum),a=avg(r),pre=before(r,sel),ak=ask(r,sel),o=q(r,sel);
+ let st,c;if(bal<=0.001){st='Done';c='G'}else if(sel<r.s&&cum===r.d){st='Upcoming';c='N'}else if(o==null){st='Not logged';c='N'}else if(o>=ak){st='On rate';c='G'}else if(o>=.7*ak){st='Slightly low';c='A'}else{st='Below rate';c='R'}
+ let fc=null;if(bal>0&&a>0){const dn=Math.ceil(bal/a),eta=new Date(dd(sel).getTime()+dn*DAY);fc={eta,late:Math.round((eta-dd(r.e))/DAY)}}
+ return{cum,bal,a,ak,o,st,c,fc,pct:cum/r.sc}}
+function render(){
+ if(!D[cur]) return;
+ if($('generatedAt')) $('generatedAt').textContent=GENERATED_AT?'Generated '+GENERATED_AT:'';
+ const rows=D[cur].rows,m=rows.map(r=>({r,...info(r)}));
+ const act=m.filter(y=>y.bal>0.001&&sel>=y.r.s),logged=act.filter(y=>y.o!=null),met=act.filter(y=>y.st=='On rate');
+ const A=m.reduce((s,y)=>s+Math.min(1,y.pct),0)/m.length,short=act.reduce((s,y)=>s+Math.max(0,y.r.mn-y.r.ma),0),miss=m.filter(y=>y.fc&&y.fc.late>0).length;
+ const kp=(l,v,c)=>`<div class="c"><div class="l">${l}</div><div class="v big" ${c?`style="color:var(--${c})"`:''}>${v}</div></div>`;
+ $('k').innerHTML=kp('Overall complete',Math.round(A*100)+'%','acc')+kp('Active activities',act.length)+kp('Logged for '+fm(sel),logged.length+' / '+act.length)+kp('Met asking rate',met.length+' / '+logged.length,met.length>=logged.length*.7?'ok':'bad')+kp('Workmen shortfall',short,short?'bad':'ok')+kp('Forecast to miss target',miss,miss?'bad':'ok');
+ $('tabs').innerHTML=Object.keys(D).map(k=>`<button class="${k==cur?'a':''}" onclick="cur='${k}';render()">${D[k].name}</button>`).join(' ');
+ const days=Object.keys(LG[cur]).sort().slice(-14);
+ $('ch').innerHTML=days.length?days.map(k=>{const es=rows.filter(r=>LG[cur][k][r.i]!=null),ok=es.filter(r=>LG[cur][k][r.i]>=ask(r,k)).length,p=es.length?Math.round(ok/es.length*100):0;return`<div title="${ok}/${es.length} met rate"><span>${p}%</span><i style="height:${Math.max(2,p*.6)}px"></i><span>${fm(k)}</span></div>`}).join(''):'<span class="sub">No daily entries yet — enter output in the table below to start the trend.</span>';
+ const cnt=n=>m.filter(y=>flt(y,n)).length;
+ $('f').innerHTML=FL.map(n=>`<button class="sm ${fs==n?'a':''}" onclick="fs='${n}';render()">${n} (${cnt(n)})</button>`).join('')+'<span style="flex:1"></span>'+[['tb','Table'],['mx','Daily matrix']].map(a=>`<button class="sm ${view==a[0]?'a':''}" onclick="view='${a[0]}';render()">${a[1]}</button>`).join('');
+ $('tb').innerHTML=m.filter(y=>flt(y,fs)).map(y=>{const r=y.r,short=r.mn>r.ma,sf=y.fc?(y.fc.late>0?`<span class="neg">${fm(iso(y.fc.eta))} (+${y.fc.late}d)</span>`:`<span class="pos">${fm(iso(y.fc.eta))}</span>`):'—';
+  return`<tr><td><a class="an" onclick="pick(${r.i})">${r.n}</a><small>${r.g} · target ${fm(r.e)}</small></td><td>${f1(y.cum)} / ${f1(r.sc)} ${r.u}<div class="bar"><i style="width:${Math.min(100,y.pct*100)}%"></i></div></td>
+  <td>${f1(y.bal)}</td><td><b>${f1(y.ak)}</b> ${r.u}</td><td><input type="number" min="0" step="any" value="${y.o??''}" placeholder="0" onchange="sv(${r.i},this.value)"></td>
+  <td>${y.a==null?'—':f1(y.a)}</td><td>${sf}</td><td class="${short?'neg':''}">${r.ma} / ${r.mn}</td><td><span class="s ${y.c}">${y.st}</span></td></tr>`}).join('')||'<tr><td colspan="9" class="sub">Nothing in this view.</td></tr>';
+ $('dt').value=sel;$('dt').min='2026-10-04';$('dt').max=TODAY;
+ const all=Object.values(LG).flatMap(o=>Object.keys(o));$('asof').textContent='Viewing '+dd(sel).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+(all.length?' · latest entry '+fm(all.sort().pop()):'');
+ extra(m);
+}
+
+const pf=(r,k)=>Math.max(0,Math.min(1,(dd(k)-dd(r.s))/(dd(r.e)-dd(r.s))));
+function days(){const o=[];let t=dd('2026-10-04');const e=dd(TODAY<'2026-10-04'?'2026-10-04':TODAY);while(t<=e){o.push(iso(t));t=new Date(t.getTime()+DAY)}return o.slice(-14)}
+function span(){const o=[BASE];let t=dd(BASE);const n=Math.max(14,Math.round((dd(TODAY)-t)/DAY));for(let i=0;i<n;i++){t=new Date(t.getTime()+DAY);o.push(iso(t))}return o}
+function ln(se,labs,lo,hi,W=560,H=190){hi=hi>lo?hi:lo+1;const L=38,B=22,T=8,w=W-L-6,h=H-B-T,bm=se.some(z=>z.b),n=labs.length,X=i=>bm?L+(i+.5)*w/n:L+i*w/Math.max(1,n-1),Y=v=>T+h-(v-lo)/(hi-lo)*h;
+ let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+ for(let g=0;g<=4;g++){const v=lo+(hi-lo)*g/4;s+=`<line class="gr" x1="${L}" x2="${W-6}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-4}" y="${Y(v)+3}" text-anchor="end">${f1(v)}</text>`}
+ labs.forEach((t,i)=>{if(i%Math.ceil(n/8)==0)s+=`<text x="${X(i)}" y="${H-6}" text-anchor="middle">${fm(t)}</text>`});
+ se.forEach(z=>{if(z.b){z.v.forEach((v,i)=>{if(v!=null)s+=`<rect x="${X(i)-w/n*.25}" y="${Y(v)}" width="${w/n*.5}" height="${Math.max(0,Y(lo)-Y(v))}" style="fill:var(${z.c})"/>`});return}
+  const p=z.v.map((v,i)=>v==null?null:[X(i),Y(v)]).filter(Boolean);
+  s+=`<polyline class="ln" style="stroke:var(${z.c})${z.d?';stroke-dasharray:5 4':''}" points="${p.map(a=>a.join(',')).join(' ')}"/>`+p.map(a=>`<circle cx="${a[0]}" cy="${a[1]}" r="3" style="fill:var(${z.c})"/>`).join('')});
+ return s+'</svg>'}
+const LEG='<div class="sub"><span style="color:var(--acc)">■</span> actual &nbsp; <span style="color:var(--bad)">┅</span> plan / asking rate</div>';
+function cumAt(r,k){let c=r.d;for(const x in LG[cur])if(x<=k&&LG[cur][x][r.i]!=null)c+=LG[cur][x][r.i];return c}
+function trend(rows){const sp=span(),a=sp.map(k=>k>TODAY?null:rows.reduce((s,r)=>s+Math.min(1,cumAt(r,k)/r.sc),0)/rows.length*100),p=sp.map(k=>rows.reduce((s,r)=>s+pf(r,k),0)/rows.length*100),vs=[...a,...p].filter(v=>v!=null);
+ return ln([{v:p,c:'--bad',d:1},{v:a,c:'--acc'}],sp,Math.floor(Math.min(...vs)-1),Math.ceil(Math.max(...vs)+1))+LEG}
+function det(y){const r=y.r,ds=days(),sp=span(),out=ds.map(k=>q(r,k)??0),ak=ds.map(k=>ask(r,k)),mx=Math.max(1,...out,...ak)*1.15,
+ cum=sp.map(k=>k>TODAY?null:cumAt(r,k)),req=sp.map(k=>r.d+(r.sc-r.d)*Math.max(0,Math.min(1,(dd(k)-dd(BASE))/(dd(r.e)-dd(BASE))))),lo=Math.max(0,r.d-(r.sc-r.d)*.15),st=(l,v)=>`<div><div class="l">${l}</div><b>${v}</b></div>`;
+ return`<div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:17px">${r.n}</b><div class="sub">${D[cur].name} · ${r.g} · ${fm(r.s)} → ${fm(r.e)} · ${r.u}</div></div><button class="sm" onclick="ai=null;render()">Close ✕</button></div>
+ <div class="k" style="margin:10px 0">${st('Complete',Math.round(y.pct*100)+'%')+st('Balance',f1(y.bal)+' '+r.u)+st('Asking / day',f1(y.ak))+st('7-day avg',y.a==null?'—':f1(y.a))+st('Workmen',r.ma+' / '+r.mn)}</div>
+ <div class="two"><div><div class="l">Daily output vs asking rate (${r.u}/day)</div>${ln([{v:out,c:'--acc',b:1},{v:ak,c:'--bad',d:1}],ds,0,mx)}</div><div><div class="l">Cumulative actual vs required path (${r.u})</div>${ln([{v:req,c:'--bad',d:1},{v:cum,c:'--acc'}],sp,lo,r.sc)}</div></div>${LEG}`}
+function hmx(m){const ds=days();return'<table class="hm"><thead><tr><th></th>'+ds.map(k=>`<th>${dd(k).getDate()}/${dd(k).getMonth()+1}</th>`).join('')+'</tr></thead><tbody>'+m.map(y=>`<tr><td style="white-space:nowrap;padding-right:10px"><a class="an" onclick="pick(${y.r.i})">${y.r.n}</a> <span class="sub">${y.r.u}</span></td>`+ds.map(k=>{const o=q(y.r,k),a=ask(y.r,k);return o==null?'<td class="x n" title="not logged"></td>':`<td class="x ${o>=a?'G':o>=.7*a?'A':'R'}" title="${f1(o)} vs asking ${f1(a)}">${f1(o)}</td>`}).join('')+'</tr>').join('')+'</tbody></table>'}
+function pick(i){ai=i;render();$('dp').scrollIntoView({behavior:'smooth'})}
+function extra(m){const rows=D[cur].rows;
+ $('tc').style.display=view=='tb'?'':'none';$('mx').style.display=view=='mx'?'':'none';$('tr').innerHTML=trend(rows);
+ const gs=[...new Set(rows.map(r=>r.g))];
+ $('gp').innerHTML=gs.map(g=>{const x=m.filter(y=>y.r.g==g),a=x.reduce((s,y)=>s+Math.min(1,y.pct),0)/x.length*100,p=x.reduce((s,y)=>s+pf(y.r,sel),0)/x.length*100;return`<div class="gb"><div><span>${g}</span><span>${Math.round(a)}% <span class="sub">(plan ${Math.round(p)}%)</span></span></div><div class="bar" style="width:100%"><i style="width:${a}%"></i><b style="left:${p}%"></b></div></div>`}).join('');
+ const at=m.filter(y=>y.bal>.001&&sel>=y.r.s).map(y=>({y,s:(y.fc&&y.fc.late>0?y.fc.late:0)+(y.st=='Below rate'?5:0)+(y.r.mn>y.r.ma?2:0)})).filter(z=>z.s>0).sort((a,b)=>b.s-a.s).slice(0,5);
+ $('gp').innerHTML+='<div class="l" style="margin-top:12px">Needs attention</div>'+(at.length?at.map(z=>`<div style="font-size:12px;margin-top:4px"><a class="an" onclick="pick(${z.y.r.i})">${z.y.r.n}</a> — ${[z.y.st=='Below rate'?'below asking rate':'',z.y.fc&&z.y.fc.late>0?'forecast +'+z.y.fc.late+'d late':'',z.y.r.mn>z.y.r.ma?'short '+(z.y.r.mn-z.y.r.ma)+' workmen':''].filter(Boolean).join(', ')}</div>`).join(''):'<div class="sub">Nothing flagged.</div>');
+ $('mxb').innerHTML=hmx(m.filter(y=>flt(y,fs)));
+ const y=m.find(z=>z.r.i==ai);$('dp').style.display=y?'':'none';if(y)$('dp').innerHTML=det(y)}
+function flt(y,n){return n=='All'||(n=='Active'&&y.bal>.001&&sel>=y.r.s)||(n=='Below rate'&&(y.st=='Below rate'||y.st=='Slightly low'))||(n=='Upcoming'&&y.st=='Upcoming')||(n=='Done'&&y.bal<=.001)}
+function sd(v){if(v&&v>='2026-10-04'&&v<=TODAY){sel=v;render()}}function mv(n){sd(iso(dd(sel).getTime()+n*DAY))}
+function sv(i,v){const b=cur,L=LG[b];L[sel]=L[sel]||{};if(v===''||isNaN(v))delete L[sel][i];else L[sel][i]=Math.max(0,parseFloat(v));if(!Object.keys(L[sel]).length)delete L[sel];try{localStorage.setItem('dailyProgressLG',JSON.stringify(LG));toast('Saved on this device')}catch(e){toast('Saved for this session')}render()}
+async function loadGoogleData(){
+ loading(true,'Reading Google Sheet…');
+ $('xlstatus').textContent='Reading OPD / EMR data from Google Sheets…';
+ try{
+  if(typeof XLSX==='undefined') throw new Error('Data reader could not be loaded. Check your internet connection.');
+  const urls={
+   opd:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ4dAcE7glYk2PAtd47gNP_Yi7y_rL5jvD6mqEmLvkZV1skWQ14LrW1_zt79BueFK5CbNnuiWm8zz4/pub?gid=2055927213&output=csv',
+   emr:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ4dAcE7glYk2PAtd47gNP_Yi7y_rL5jvD6mqEmLvkZV1skWQ14LrW1_zt79BueFK5CbNnuiWm8zz4/pub?gid=1693021498&output=csv'
+  };
+  const norm=x=>String(x??'').trim().toLowerCase();
+  const find=(obj,names)=>{for(const k of Object.keys(obj)){if(names.includes(norm(k))) return obj[k];} return '';};
+  const date=x=>{
+   if(x instanceof Date && !isNaN(x)) return x.toISOString().slice(0,10);
+   if(x==='' || x==null) return null;
+   const d=new Date(x); if(!isNaN(d)) return d.toISOString().slice(0,10);
+   const m=String(x).match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+   return String(x);
+  };
+  const num=x=>{const n=Number(x); return Number.isFinite(n)?n:0};
+  const next={};
+  for(const key of ['opd','emr']){
+   const res=await fetch(urls[key],{cache:'no-store'});
+   if(!res.ok) throw new Error(`${key.toUpperCase()} data could not be loaded (${res.status}).`);
+   const csv=await res.text();
+   const wb=XLSX.read(csv,{type:'string',cellDates:true});
+   const ws=wb.Sheets[wb.SheetNames[0]];
+   if(!ws) throw new Error(`${key.toUpperCase()} sheet returned no data.`);
+   const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+   next[key]={name:key==='opd'?'OPD Building':'Emergency Building',rows:rows.map((r,i)=>({
+    i,g:String(find(r,['section','group','work package'])).trim(),n:String(find(r,['activity','name'])).trim(),u:String(find(r,['unit','u'])).trim(),
+    sc:num(find(r,['target','scope','sc'])),d:num(find(r,['done','done to date','progress','d'])),s:date(find(r,['start','start date','s'])),e:date(find(r,['end','end date','finish','finish date','e'])),
+    mn:num(find(r,['manpower available','available manpower','mn'])),ma:num(find(r,['manpower needed','required manpower','ma']))
+   })).filter(r=>r.n && r.sc!==0)};
+  }
+  if(!next.opd || !next.emr || !next.opd.rows.length || !next.emr.rows.length) throw new Error('OPD or EMR data is empty. Check the published Google Sheet tabs.');
+  loading(true,'Generating dashboard…');
+  await new Promise(r=>setTimeout(r,60));
+  D=next; cur='opd'; ai=null; fs='Active'; sel=TODAY<'2026-10-04'?'2026-10-04':TODAY;
+  const refreshed=new Date().toLocaleString('en-GB',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  $('xlstatus').textContent=`Updated ${refreshed} · ${D.opd.rows.length} OPD + ${D.emr.rows.length} EMR activities`;
+  render();
+  $('downloadBtn').disabled=false;
+ }catch(e){
+  console.error(e);
+  $('xlstatus').textContent='Could not load Google Sheet data: '+e.message;
+  toast('Google Sheet data could not be loaded');
+ }finally{loading(false)}
+}
+function downloadDashboard(){
+ if(!Object.keys(D).length)return;
+ const html=document.documentElement.outerHTML;
+ const data=JSON.stringify(D).replace(/</g,'\u003c');
+ const daily=JSON.stringify(LG).replace(/</g,'\u003c');
+ const generated=new Date().toLocaleString('en-GB',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+ const embedded=html.replace("const GENERATED_AT='';",`const GENERATED_AT=${JSON.stringify(generated)};`).replace('let D={};',`let D=${data};`).replace('const LG={opd:{},emr:{}}',`const LG=${daily}`);
+ const blob=new Blob(['<!DOCTYPE html>\n'+embedded],{type:'text/html;charset=utf-8'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);const fileStamp=new Date().toLocaleString('sv-SE',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).replace(' ','_').replaceAll(':','-');a.download=`Daily-Site-Progress-Dashboard_${fileStamp}.html`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+ toast('Dashboard downloaded');
+}
+// Load the latest data from the published Google Sheet when the dashboard opens.
+try{const saved=localStorage.getItem('dailyProgressLG');if(saved)Object.assign(LG,JSON.parse(saved))}catch(e){}
+loadGoogleData();
+</script></body></html>
