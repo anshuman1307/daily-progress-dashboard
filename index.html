@@ -178,12 +178,18 @@ async function loadExcelData(){
     const doneVal=iDone>=0?row[iDone]:null;
     if(!activity){continue;}
     const scope=num(scopeVal);
+    const unit=String(iUnit>=0?row[iUnit]??'':'').trim();
+    const rawDone=num(doneVal);
+    // In this workbook, 'Achieved as on 3rd Oct' is stored as a percentage
+    // for quantity-based activities (e.g. Brickwork = 0.973 = 97.3%).
+    // Activities whose UOM is '%' already store percentage points (e.g. 31 = 31%).
+    const done=unit.includes('%')?rawDone:rawDone*scope;
     const hasDate=startVal!==null&&startVal!=='';
     const hasDone=doneVal!==null&&doneVal!=='';
     const hasScope=scopeVal!==null&&scopeVal!=='';
     // Section/group rows such as Structure, Finishes, MEP, Terrace, etc.
     if(!hasDate&&!hasDone&&!hasScope){section=activity;continue;}
-    rows.push({i:rows.length,g:section,n:activity,u:String(iUnit>=0?row[iUnit]??'':'').trim(),sc:scope,d:num(doneVal),s:date(startVal),e:date(iEnd>=0?row[iEnd]:null),mn:num(iMn>=0?row[iMn]:null),ma:num(iMa>=0?row[iMa]:null)});
+    rows.push({i:rows.length,g:section,n:activity,u:unit,sc:scope,d:done,s:date(startVal),e:date(iEnd>=0?row[iEnd]:null),mn:num(iMn>=0?row[iMn]:null),ma:num(iMa>=0?row[iMa]:null)});
    }
    return {name:displayName,rows};
   };
