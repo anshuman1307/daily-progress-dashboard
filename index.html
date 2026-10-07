@@ -49,7 +49,7 @@ svg{display:block}svg text{fill:var(--mute);font-size:10px}.gr{stroke:var(--line
 </style></head><body><div class="w">
 <header><div><h1>Daily Site Progress Tracker</h1><div class="sub" id="asof"></div><div class="sub" id="generatedAt"></div></div>
 <div class="live" id="live"><span class="dot"></span><span id="lt">Local only</span></div></header>
-<div class="bar0"><button id="refreshBtn" class="sm a" onclick="loadGoogleData()">Refresh Data</button><span id="xlstatus" class="sub">Loading OPD / EMR data from Google Sheets…</span><button id="downloadBtn" class="sm" onclick="downloadDashboard()" disabled>Download Dashboard</button><span style="flex:1"></span>
+<div class="bar0"><button id="refreshBtn" class="sm a" onclick="loadExcelData()">Refresh Data</button><span id="xlstatus" class="sub">Loading OPD / EMR data from Book1.xlsx…</span><button id="downloadBtn" class="sm" onclick="downloadDashboard()" disabled>Download Dashboard</button><span style="flex:1"></span>
 <button class="sm" onclick="mv(-1)">◀</button><input type="date" id="dt" onchange="sd(this.value)"><button class="sm" onclick="mv(1)">▶</button><button class="sm" onclick="sd(TODAY)">Today</button></div>
 <div id="tabs" class="bar0" style="margin-top:12px"></div>
 <div class="k" id="k"></div>
@@ -134,35 +134,18 @@ function extra(m){const rows=D[cur].rows;
 function flt(y,n){return n=='All'||(n=='Active'&&y.bal>.001&&sel>=y.r.s)||(n=='Below rate'&&(y.st=='Below rate'||y.st=='Slightly low'))||(n=='Upcoming'&&y.st=='Upcoming')||(n=='Done'&&y.bal<=.001)}
 function sd(v){if(v&&v>='2026-10-04'&&v<=TODAY){sel=v;render()}}function mv(n){sd(iso(dd(sel).getTime()+n*DAY))}
 function sv(i,v){const b=cur,L=LG[b];L[sel]=L[sel]||{};if(v===''||isNaN(v))delete L[sel][i];else L[sel][i]=Math.max(0,parseFloat(v));if(!Object.keys(L[sel]).length)delete L[sel];try{localStorage.setItem('dailyProgressLG',JSON.stringify(LG));toast('Saved on this device')}catch(e){toast('Saved for this session')}render()}
-async function loadGoogleData(){
- loading(true,'Reading Google Sheet…');
- $('xlstatus').textContent='Reading OPD / EMR data from Google Sheets…';
+async function loadExcelData(){
+ loading(true,'Reading Excel…');
+ $('xlstatus').textContent='Reading Book1.xlsx from this repository…';
  try{
-  const urls={
-   opd:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ4dAcE7glYk2PAtd47gNP_Yi7y_rL5jvD6mqEmLvkZV1skWQ14LrW1_zt79BueFK5CbNnuiWm8zz4/pub?gid=2055927213&single=true&output=csv',
-   emr:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQ4dAcE7glYk2PAtd47gNP_Yi7y_rL5jvD6mqEmLvkZV1skWQ14LrW1_zt79BueFK5CbNnuiWm8zz4/pub?gid=1693021498&single=true&output=csv'
-  };
+  const res=await fetch('./Book1.xlsx?ts='+Date.now(),{cache:'no-store'});
+  if(!res.ok)throw new Error(`Book1.xlsx could not be loaded (${res.status}). Make sure Book1.xlsx is in the same GitHub repository as index.html.`);
+  const buf=await res.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
   const norm=x=>String(x??'').replace(/^\uFEFF/,'').trim().toLowerCase();
-  const csvRows=text=>{
-   const out=[]; let row=[], field='', quoted=false;
-   for(let i=0;i<text.length;i++){
-    const c=text[i];
-    if(quoted){
-     if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else quoted=false; }
-     else field+=c;
-    }else{
-     if(c==='"') quoted=true;
-     else if(c===','){row.push(field);field='';}
-     else if(c==='\n'){row.push(field.replace(/\r$/,''));out.push(row);row=[];field='';}
-     else field+=c;
-    }
-   }
-   if(field!==''||row.length){row.push(field.replace(/\r$/,''));out.push(row);}
-   return out;
-  };
-  const find=(obj,names)=>{for(const k of Object.keys(obj)){if(names.includes(norm(k))) return obj[k];} return '';};
   const date=x=>{
    if(x===''||x==null)return null;
+   if(x instanceof Date&&!isNaN(x))return x.toISOString().slice(0,10);
    const v=String(x).trim();
    let m=v.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
    if(m){let y=Number(m[3]);if(y<100)y+=2000;return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;}
@@ -170,39 +153,41 @@ async function loadGoogleData(){
    if(m){const d=new Date(`${m[1]} ${m[2]} ${m[3]}`);if(!isNaN(d))return d.toISOString().slice(0,10);}
    const d=new Date(v);return isNaN(d)?v:d.toISOString().slice(0,10);
   };
-  const num=x=>{const n=Number(String(x??'').replace(/,/g,''));return Number.isFinite(n)?n:0};
-  const next={};
-  for(const key of ['opd','emr']){
-   const res=await fetch(urls[key],{cache:'no-store'});
-   if(!res.ok)throw new Error(`${key.toUpperCase()} data could not be loaded (${res.status}).`);
-   const text=await res.text();
-   const matrix=csvRows(text);
+  const num=x=>{if(x===''||x==null)return 0;const n=Number(String(x).replace(/,/g,''));return Number.isFinite(n)?n:0;};
+  const readSheet=(sheetName,displayName)=>{
+   const ws=wb.Sheets[sheetName];
+   if(!ws)throw new Error(`Sheet "${sheetName}" was not found in Book1.xlsx.`);
+   const matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
    const headerIndex=matrix.findIndex(row=>row.some(v=>norm(v)==='activity'));
-   if(headerIndex<0)throw new Error(`${key.toUpperCase()} data could not be read: ACTIVITY header not found.`);
+   if(headerIndex<0)throw new Error(`${sheetName}: ACTIVITY header not found.`);
    const headers=matrix[headerIndex].map(v=>String(v??'').trim());
+   const idx=names=>{for(let i=0;i<headers.length;i++)if(names.includes(norm(headers[i])))return i;return -1;};
+   const iActivity=idx(['activity','name']), iStart=idx(['plan / actual start','start','start date']), iEnd=idx(['target date','end','finish','finish date']), iUnit=idx(['uom','unit','u']), iScope=idx(['scope','target','sc']), iDone=idx(['achieved as on 3rd oct','achieved as on 3-oct','achieved','done','progress','d']), iMn=idx(['no. of workmen needed','manpower needed','required manpower','mn']), iMa=idx(['no. of workmen available','manpower available','available manpower','ma']);
    const rows=[]; let section='';
    for(const row of matrix.slice(headerIndex+1)){
-    const r=Object.fromEntries(headers.map((h,i)=>[h,row[i]??'']));
-    const activity=String(find(r,['activity','name'])).trim();
-    const scopeRaw=find(r,['target','scope','sc']);
-    const scope=num(scopeRaw);
-    const hasWorkValues=scope!==0 || String(find(r,['done','achieved','progress','d'])).trim()!=='' || String(find(r,['start','plan / actual start','start date','s'])).trim()!=='';
-    if(!activity && !hasWorkValues)continue;
-    if(!activity)continue;
-    // Category rows such as Structure / Finishes / MEP are kept as grouping labels.
-    if(scope===0 && !find(r,['start','plan / actual start','start date','s']) && !find(r,['done','achieved','progress','d']) && !find(r,['target','scope','sc'])){section=activity;continue;}
-    const g=section;
-    rows.push({i:rows.length,g,n:activity,u:String(find(r,['unit','u'])).trim(),sc:scope,d:num(find(r,['done','achieved','achieved as on 3rd oct','progress','d'])),s:date(find(r,['start','plan / actual start','start date','s'])),e:date(find(r,['end','target date','finish','finish date','e'])),mn:num(find(r,['manpower needed','required manpower','mn'])),ma:num(find(r,['manpower available','available manpower','ma']))});
+    const activity=String(iActivity>=0?row[iActivity]??'':'').trim();
+    const scopeVal=iScope>=0?row[iScope]:null;
+    const startVal=iStart>=0?row[iStart]:null;
+    const doneVal=iDone>=0?row[iDone]:null;
+    if(!activity){continue;}
+    const scope=num(scopeVal);
+    const hasDate=startVal!==null&&startVal!=='';
+    const hasDone=doneVal!==null&&doneVal!=='';
+    const hasScope=scopeVal!==null&&scopeVal!=='';
+    // Section/group rows such as Structure, Finishes, MEP, Terrace, etc.
+    if(!hasDate&&!hasDone&&!hasScope){section=activity;continue;}
+    rows.push({i:rows.length,g:section,n:activity,u:String(iUnit>=0?row[iUnit]??'':'').trim(),sc:scope,d:num(doneVal),s:date(startVal),e:date(iEnd>=0?row[iEnd]:null),mn:num(iMn>=0?row[iMn]:null),ma:num(iMa>=0?row[iMa]:null)});
    }
-   next[key]={name:key==='opd'?'OPD Building':'Emergency Building',rows};
-  }
+   return {name:displayName,rows};
+  };
+  const next={opd:readSheet('OPD BACKUP','OPD Building'),emr:readSheet('EMR BACKUP','Emergency Building')};
   if(!next.opd.rows.length||!next.emr.rows.length)throw new Error(`OPD or EMR data is empty. Parsed ${next.opd.rows.length} OPD and ${next.emr.rows.length} EMR activities.`);
   loading(true,'Generating dashboard…'); await new Promise(r=>setTimeout(r,60));
   D=next;cur='opd';ai=null;fs='Active';sel=TODAY<'2026-10-04'?'2026-10-04':TODAY;
   const refreshed=new Date().toLocaleString('en-GB',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
   $('xlstatus').textContent=`Updated ${refreshed} · ${D.opd.rows.length} OPD + ${D.emr.rows.length} EMR activities`;
-  $('downloadBtn').disabled=false; render(); toast('Google Sheet data loaded');
- }catch(e){console.error(e);$('xlstatus').textContent=e.message||'Could not load Google Sheet data.';toast(e.message||'Could not load Google Sheet data.');}
+  $('downloadBtn').disabled=false;render();toast('Excel data loaded');
+ }catch(e){console.error(e);$('xlstatus').textContent=e.message||'Could not load Excel data.';toast(e.message||'Could not load Excel data.');}
  finally{loading(false)}
 }
 function downloadDashboard(){
@@ -216,7 +201,7 @@ function downloadDashboard(){
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);const fileStamp=new Date().toLocaleString('sv-SE',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).replace(' ','_').replaceAll(':','-');a.download=`Daily-Site-Progress-Dashboard_${fileStamp}.html`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
  toast('Dashboard downloaded');
 }
-// Load the latest data from the published Google Sheet when the dashboard opens.
+// Load the latest Book1.xlsx from the same repository when the dashboard opens.
 try{const saved=localStorage.getItem('dailyProgressLG');if(saved)Object.assign(LG,JSON.parse(saved))}catch(e){}
-loadGoogleData();
+loadExcelData();
 </script></body></html>
