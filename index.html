@@ -67,18 +67,18 @@ let D={};const GENERATED_AT='';const BASE='2026-10-03',DAY=864e5,TODAY=new Date(
 const FL=['Active','Below rate','Upcoming','Done','All'];
 let cur='opd',fs='Active',view='tb',ai=null,sel=TODAY<'2026-10-04'?'2026-10-04':TODAY;const LG={opd:{},emr:{}},tm={};
 const $=id=>document.getElementById(id),dd=s=>new Date(s+'T00:00:00'),iso=x=>new Date(x-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
-const f1=x=>x>=100?Math.round(x).toLocaleString():(Math.round(x*10)/10).toString();
-const fm=s=>dd(s).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+const f1=x=>Number.isFinite(Number(x))?(x>=100?Math.round(x).toLocaleString():(Math.round(x*10)/10).toString()):'—';
+const fm=s=>{const d=dd(s);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});};
 function toast(m){const t=$('t');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2400)}
 function loading(on,msg='Reading Excel…'){const l=$('loader');$('loadertext').textContent=msg;l.classList.toggle('show',on);$('refreshBtn').disabled=on;$('downloadBtn').disabled=on||!Object.keys(D).length}
 const q=(r,date)=>LG[cur][date]?.[r.i];
-function before(r,date){let s=r.d;for(const k in LG[cur])if(k<date&&LG[cur][k][r.i]!=null)s+=LG[cur][k][r.i];return s}
-function ask(r,date){const e=dd(r.e),dl=Math.max(1,Math.ceil((e-dd(date))/DAY));return Math.max(0,r.sc-before(r,date))/dl}
-function avg(r){let s=0,n=0;for(let i=0;i<7;i++){const k=iso(dd(sel)-i*DAY),x=LG[cur][k];if(x&&Object.keys(x).length){n++;s+=x[r.i]||0}}return n?s/n:null}
+function before(r,date){let s=Number(r.d)||0;for(const k in LG[cur]){const v=Number(LG[cur][k]?.[r.i]);if(k<date&&Number.isFinite(v))s+=v}return s}
+function ask(r,date){const e=dd(r.e);if(Number.isNaN(e.getTime()))return 0;const dl=Math.max(1,Math.ceil((e-dd(date))/DAY));return Math.max(0,r.sc-before(r,date))/dl}
+function avg(r){let s=0,n=0;for(let i=0;i<7;i++){const k=iso(dd(sel)-i*DAY),x=LG[cur][k],v=Number(x?.[r.i]);if(Number.isFinite(v)){n++;s+=v}}return n?s/n:null}
 function info(r){const cum=before(r,'9999')>=0?before(r,'9999'):r.d,bal=Math.max(0,r.sc-cum),a=avg(r),pre=before(r,sel),ak=ask(r,sel),o=q(r,sel);
- let st,c;if(bal<=0.001){st='Done';c='G'}else if(sel<r.s&&cum===r.d){st='Upcoming';c='N'}else if(o==null){st='Not logged';c='N'}else if(o>=ak){st='On rate';c='G'}else if(o>=.7*ak){st='Slightly low';c='A'}else{st='Below rate';c='R'}
- let fc=null;if(bal>0&&a>0){const dn=Math.ceil(bal/a),eta=new Date(dd(sel).getTime()+dn*DAY);fc={eta,late:Math.round((eta-dd(r.e))/DAY)}}
- return{cum,bal,a,ak,o,st,c,fc,pct:cum/r.sc}}
+ let st,c;if(bal<=0.001){st='Done';c='G'}else if(r.s&&sel<r.s&&cum===r.d){st='Upcoming';c='N'}else if(o==null){st='Not logged';c='N'}else if(o>=ak){st='On rate';c='G'}else if(o>=.7*ak){st='Slightly low';c='A'}else{st='Below rate';c='R'}
+ let fc=null;if(bal>0&&a>0&&r.e&& !Number.isNaN(dd(r.e).getTime())){const dn=Math.ceil(bal/a),eta=new Date(dd(sel).getTime()+dn*DAY);fc={eta,late:Math.round((eta-dd(r.e))/DAY)}}
+ return{cum,bal,a,ak,o,st,c,fc,pct:r.sc>0?cum/r.sc:0}}
 function render(){
  if(!D[cur]) return;
  if($('generatedAt')) $('generatedAt').textContent=GENERATED_AT?'Generated '+GENERATED_AT:'';
@@ -101,23 +101,30 @@ function render(){
  extra(m);
 }
 
-const pf=(r,k)=>Math.max(0,Math.min(1,(dd(k)-dd(r.s))/(dd(r.e)-dd(r.s))));
+const pf=(r,k)=>{if(!r.s||!r.e)return null;const s=dd(r.s),e=dd(r.e),d=dd(k);if([s,e,d].some(x=>Number.isNaN(x.getTime()))||e<=s)return null;return Math.max(0,Math.min(1,(d-s)/(e-s)));};
 function days(){const o=[];let t=dd('2026-10-04');const e=dd(TODAY<'2026-10-04'?'2026-10-04':TODAY);while(t<=e){o.push(iso(t));t=new Date(t.getTime()+DAY)}return o.slice(-14)}
 function span(){const o=[BASE];let t=dd(BASE);const n=Math.max(14,Math.round((dd(TODAY)-t)/DAY));for(let i=0;i<n;i++){t=new Date(t.getTime()+DAY);o.push(iso(t))}return o}
-function ln(se,labs,lo,hi,W=560,H=190){hi=hi>lo?hi:lo+1;const L=38,B=22,T=8,w=W-L-6,h=H-B-T,bm=se.some(z=>z.b),n=labs.length,X=i=>bm?L+(i+.5)*w/n:L+i*w/Math.max(1,n-1),Y=v=>T+h-(v-lo)/(hi-lo)*h;
+function ln(se,labs,lo,hi,W=560,H=190){
+ const clean=v=>Number.isFinite(Number(v))?Number(v):null;
+ lo=clean(lo);hi=clean(hi);
+ const all=se.flatMap(z=>z.v||[]).map(clean).filter(v=>v!=null);
+ if(lo==null)lo=all.length?Math.min(...all):0;
+ if(hi==null)hi=all.length?Math.max(...all):1;
+ if(!(hi>lo)){const pad=Math.max(1,Math.abs(lo)*0.1);hi=lo+pad;}
+ const L=38,B=22,T=8,w=W-L-6,h=H-B-T,bm=se.some(z=>z.b),n=labs.length,X=i=>bm?L+(i+.5)*w/Math.max(1,n):L+i*w/Math.max(1,n-1),Y=v=>T+h-(clean(v)-lo)/(hi-lo)*h;
  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
  for(let g=0;g<=4;g++){const v=lo+(hi-lo)*g/4;s+=`<line class="gr" x1="${L}" x2="${W-6}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-4}" y="${Y(v)+3}" text-anchor="end">${f1(v)}</text>`}
  labs.forEach((t,i)=>{if(i%Math.ceil(n/8)==0)s+=`<text x="${X(i)}" y="${H-6}" text-anchor="middle">${fm(t)}</text>`});
  se.forEach(z=>{if(z.b){z.v.forEach((v,i)=>{if(v!=null)s+=`<rect x="${X(i)-w/n*.25}" y="${Y(v)}" width="${w/n*.5}" height="${Math.max(0,Y(lo)-Y(v))}" style="fill:var(${z.c})"/>`});return}
-  const p=z.v.map((v,i)=>v==null?null:[X(i),Y(v)]).filter(Boolean);
+  const p=(z.v||[]).map((v,i)=>{const n=clean(v);return n==null?null:[X(i),Y(n)]}).filter(Boolean);
   s+=`<polyline class="ln" style="stroke:var(${z.c})${z.d?';stroke-dasharray:5 4':''}" points="${p.map(a=>a.join(',')).join(' ')}"/>`+p.map(a=>`<circle cx="${a[0]}" cy="${a[1]}" r="3" style="fill:var(${z.c})"/>`).join('')});
  return s+'</svg>'}
 const LEG='<div class="sub"><span style="color:var(--acc)">■</span> actual &nbsp; <span style="color:var(--bad)">┅</span> plan / asking rate</div>';
-function cumAt(r,k){let c=r.d;for(const x in LG[cur])if(x<=k&&LG[cur][x][r.i]!=null)c+=LG[cur][x][r.i];return c}
-function trend(rows){const sp=span(),a=sp.map(k=>k>TODAY?null:rows.reduce((s,r)=>s+Math.min(1,cumAt(r,k)/r.sc),0)/rows.length*100),p=sp.map(k=>rows.reduce((s,r)=>s+pf(r,k),0)/rows.length*100),vs=[...a,...p].filter(v=>v!=null);
+function cumAt(r,k){let c=Number(r.d)||0;for(const x in LG[cur]){const v=Number(LG[cur][x]?.[r.i]);if(x<=k&&Number.isFinite(v))c+=v}return c}
+function trend(rows){const sp=span(),valid=rows.filter(r=>r.sc>0),a=sp.map(k=>k>TODAY?null:valid.length?valid.reduce((s,r)=>s+Math.min(1,cumAt(r,k)/r.sc),0)/valid.length*100:null),p=sp.map(k=>{const v=valid.map(r=>pf(r,k)).filter(x=>x!=null);return v.length?v.reduce((s,x)=>s+x,0)/v.length*100:null}),vs=[...a,...p].filter(v=>v!=null&&Number.isFinite(v));
  return ln([{v:p,c:'--bad',d:1},{v:a,c:'--acc'}],sp,Math.floor(Math.min(...vs)-1),Math.ceil(Math.max(...vs)+1))+LEG}
 function det(y){const r=y.r,ds=days(),sp=span(),out=ds.map(k=>q(r,k)??0),ak=ds.map(k=>ask(r,k)),mx=Math.max(1,...out,...ak)*1.15,
- cum=sp.map(k=>k>TODAY?null:cumAt(r,k)),req=sp.map(k=>r.d+(r.sc-r.d)*Math.max(0,Math.min(1,(dd(k)-dd(BASE))/(dd(r.e)-dd(BASE))))),lo=Math.max(0,r.d-(r.sc-r.d)*.15),st=(l,v)=>`<div><div class="l">${l}</div><b>${v}</b></div>`;
+ cum=sp.map(k=>k>TODAY?null:cumAt(r,k)),req=sp.map(k=>{if(!r.e)return null;const e=dd(r.e),b=dd(BASE),d=dd(k);if(Number.isNaN(e.getTime())||Number.isNaN(d.getTime()))return null;return r.d+(r.sc-r.d)*Math.max(0,Math.min(1,(d-b)/(e-b)))}),lo=Math.max(0,r.d-(r.sc-r.d)*.15),st=(l,v)=>`<div><div class="l">${l}</div><b>${v}</b></div>`;
  return`<div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:17px">${r.n}</b><div class="sub">${D[cur].name} · ${r.g} · ${fm(r.s)} → ${fm(r.e)} · ${r.u}</div></div><button class="sm" onclick="ai=null;render()">Close ✕</button></div>
  <div class="k" style="margin:10px 0">${st('Complete',Math.round(y.pct*100)+'%')+st('Balance',f1(y.bal)+' '+r.u)+st('Asking / day',f1(y.ak))+st('7-day avg',y.a==null?'—':f1(y.a))+st('Workmen',r.ma+' / '+r.mn)}</div>
  <div class="two"><div><div class="l">Daily output vs asking rate (${r.u}/day)</div>${ln([{v:out,c:'--acc',b:1},{v:ak,c:'--bad',d:1}],ds,0,mx)}</div><div><div class="l">Cumulative actual vs required path (${r.u})</div>${ln([{v:req,c:'--bad',d:1},{v:cum,c:'--acc'}],sp,lo,r.sc)}</div></div>${LEG}`}
