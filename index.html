@@ -439,7 +439,7 @@
       <div class="sub" style="margin-top: 10px">
         Baseline = quantities achieved as on 3 Oct 2026 (Book1.xlsx). Enter each
         day's output for an activity; progress, balance, asking rate (balance ÷
-        days left to target) and forecast update instantly for everyone viewing.
+        days left to target) and forecast update instantly. Entries are saved in this browser only (not shared between devices).
         Activities tracked only as % are logged in percentage points.
       </div>
     </div>
@@ -660,7 +660,7 @@
                 u: "%",
                 sc: 100.0,
                 d: 54.0,
-                s: null,
+                s: "2026-04-04",
                 e: "2026-10-20",
                 mn: 0,
                 ma: 0,
@@ -672,7 +672,7 @@
                 u: "%",
                 sc: 100.0,
                 d: 53.0,
-                s: null,
+                s: "2026-06-18",
                 e: "2026-11-05",
                 mn: 0,
                 ma: 0,
@@ -684,7 +684,7 @@
                 u: "%",
                 sc: 100.0,
                 d: 33.0,
-                s: null,
+                s: "2026-08-10",
                 e: "2026-11-22",
                 mn: 0,
                 ma: 0,
@@ -696,7 +696,7 @@
                 u: "%",
                 sc: 100.0,
                 d: 25.0,
-                s: null,
+                s: "2026-08-25",
                 e: "2026-12-05",
                 mn: 0,
                 ma: 0,
@@ -1921,9 +1921,9 @@
         for (let i = 0; i < 7; i++) {
           const k = iso(dd(sel) - i * DAY),
             x = LG[cur][k];
-          if (x && Object.keys(x).length) {
+          if (x && x[r.i] != null) {
             n++;
-            s += x[r.i] || 0;
+            s += x[r.i];
           }
         }
         return n ? s / n : null;
@@ -2306,7 +2306,10 @@
         if (value == null || value === "") return null;
         let d;
         if (value instanceof Date) d = value;
-        else if (typeof value === "number") d = XLSX.SSF.parse_date_code(value) && new Date(Date.UTC(1899, 11, 30) + value * DAY);
+        else if (typeof value === "number") {
+          const p = XLSX.SSF.parse_date_code(value);
+          return p ? `${p.y}-${String(p.m).padStart(2,"0")}-${String(p.d).padStart(2,"0")}` : null;
+        }
         else {
           const text = String(value).trim();
           let m = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
@@ -2324,7 +2327,7 @@
           if (typeof XLSX === "undefined") throw new Error("Excel reader did not load. Check your internet connection.");
           const response = await fetch("./Book1.xlsx?ts=" + Date.now(), { cache: "no-store" });
           if (!response.ok) throw new Error("Could not load Book1.xlsx. Ensure it is in the same repository folder as index.html.");
-          const workbook = XLSX.read(await response.arrayBuffer(), { type: "array", cellDates: true });
+          const workbook = XLSX.read(await response.arrayBuffer(), { type: "array" });
           const sourceRows = {};
           for (const [key, sheetName] of [["opd", "OPD BACKUP"], ["emr", "EMR BACKUP"]]) {
             const sheet = workbook.Sheets[sheetName];
@@ -2344,7 +2347,8 @@
               if (!name) continue;
               const scope = cscope >= 0 ? Number(row[cscope]) : NaN;
               const achieved = cdone >= 0 ? row[cdone] : null;
-              const fraction = typeof achieved === "number" ? achieved : Number(String(achieved ?? "").replace(/%$/, "")) / (String(achieved ?? "").includes("%") ? 100 : 1);
+              const aTxt = String(achieved ?? "").trim();
+              const fraction = typeof achieved === "number" ? achieved : aTxt === "" ? NaN : Number(aTxt.replace(/%$/, "")) / (aTxt.includes("%") ? 100 : 1);
               records.push({ name, key: normalizeActivity(name), start: cs >= 0 ? excelDate(row[cs]) : null,
                 end: ce >= 0 ? excelDate(row[ce]) : null, unit: cu >= 0 ? row[cu] : null,
                 scope: Number.isFinite(scope) && scope > 0 ? scope : null,
