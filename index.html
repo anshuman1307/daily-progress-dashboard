@@ -524,7 +524,7 @@
               {
                 i: 6,
                 g: "Finishes",
-                n: "False Ceiling \u2013 Ground Floor",
+                n: "False Ceiling \u2013 Ground Floor", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 0.0,
@@ -536,7 +536,7 @@
               {
                 i: 7,
                 g: "Finishes",
-                n: "False Ceiling \u2013 First Floor",
+                n: "False Ceiling \u2013 First Floor", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 0.0,
@@ -548,7 +548,7 @@
               {
                 i: 8,
                 g: "Finishes",
-                n: "False Ceiling \u2013 Second Floor",
+                n: "False Ceiling \u2013 Second Floor", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 0.0,
@@ -560,7 +560,7 @@
               {
                 i: 9,
                 g: "Finishes",
-                n: "False Ceiling \u2013 Third Floor",
+                n: "False Ceiling \u2013 Third Floor", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 0.0,
@@ -656,7 +656,7 @@
               {
                 i: 17,
                 g: "External",
-                n: "Elevation A (2)",
+                n: "Elevation A (2)", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 54.0,
@@ -668,7 +668,7 @@
               {
                 i: 18,
                 g: "External",
-                n: "Elevation B (2)",
+                n: "Elevation B (2)", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 53.0,
@@ -680,7 +680,7 @@
               {
                 i: 19,
                 g: "External",
-                n: "Elevation C (2)",
+                n: "Elevation C (2)", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 33.0,
@@ -692,7 +692,7 @@
               {
                 i: 20,
                 g: "External",
-                n: "Elevation D (2)",
+                n: "Elevation D (2)", x: 1,
                 u: "%",
                 sc: 100.0,
                 d: 25.0,
@@ -1894,7 +1894,9 @@
       const f1 = (x) =>
         x >= 100
           ? Math.round(x).toLocaleString()
-          : (Math.round(x * 10) / 10).toString();
+          : x >= 10
+            ? (Math.round(x * 10) / 10).toString()
+            : (Math.round(x * 100) / 100).toString();
       const fm = (s) =>
         dd(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
       function toast(m) {
@@ -1910,9 +1912,12 @@
           if (k < date && LG[cur][k][r.i] != null) s += LG[cur][k][r.i];
         return s;
       }
+      // Sheet rule: asking rate = balance ÷ days to target, less a 4-day buffer for
+      // activities already started at the 3-Oct baseline; no buffer for ones not yet started.
       function ask(r, date) {
-        const e = dd(r.e),
-          dl = Math.max(1, Math.ceil((e - dd(date)) / DAY));
+        const from = Math.max(r.s ? dd(r.s).getTime() : 0, dd(date).getTime() - DAY),
+          buf = !r.s || r.s <= BASE ? 4 : 0,
+          dl = Math.max(1, Math.round((dd(r.e) - from) / DAY) - buf);
         return Math.max(0, r.sc - before(r, date)) / dl;
       }
       function avg(r) {
@@ -1969,7 +1974,8 @@
         const act = m.filter((y) => y.bal > 0.001 && sel >= y.r.s),
           logged = act.filter((y) => y.o != null),
           met = act.filter((y) => y.st == "On rate");
-        const A = m.reduce((s, y) => s + Math.min(1, y.pct), 0) / m.length,
+        const mo = m.filter((y) => !y.r.x),
+          A = mo.reduce((s, y) => s + Math.min(1, y.pct), 0) / mo.length,
           short = act.reduce((s, y) => s + Math.max(0, y.r.mn - y.r.ma), 0),
           miss = m.filter((y) => y.fc && y.fc.late > 0).length;
         const kp = (l, v, c) =>
@@ -2224,11 +2230,11 @@
         const rows = D[cur].rows;
         $("tc").style.display = view == "tb" ? "" : "none";
         $("mx").style.display = view == "mx" ? "" : "none";
-        $("tr").innerHTML = trend(rows);
-        const gs = [...new Set(rows.map((r) => r.g))];
+        $("tr").innerHTML = trend(rows.filter((r) => !r.x));
+        const gs = [...new Set(rows.filter((r) => !r.x).map((r) => r.g))];
         $("gp").innerHTML = gs
           .map((g) => {
-            const x = m.filter((y) => y.r.g == g),
+            const x = m.filter((y) => y.r.g == g && !y.r.x),
               a =
                 (x.reduce((s, y) => s + Math.min(1, y.pct), 0) / x.length) *
                 100,
@@ -2340,7 +2346,10 @@
             const ci = column("activity", "name"), cs = column("plan / actual start", "start", "start date"),
               ce = column("target date", "end", "finish date"), cu = column("uom", "unit"),
               cscope = column("scope", "target"), cd = column("achieved as on 3rd oct", "achieved as on 3-oct", "achieved as on 3-october"),
-              cdone = cd >= 0 ? cd : column("achieved", "done", "progress");
+              cdone = cd >= 0 ? cd : column("achieved", "done", "progress"),
+              cmn = column("no. of workmen needed", "manpower needed"),
+              cma = column("no. of workmen available", "manpower available");
+            const man = (v) => { if (v == null || String(v).trim() === "") return null; if (String(v).trim() === "-") return 0; const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : null; };
             const records = [];
             for (const row of matrix.slice(headerRow + 1)) {
               const name = ci >= 0 ? String(row[ci] ?? "").trim() : "";
@@ -2352,41 +2361,58 @@
               records.push({ name, key: normalizeActivity(name), start: cs >= 0 ? excelDate(row[cs]) : null,
                 end: ce >= 0 ? excelDate(row[ce]) : null, unit: cu >= 0 ? row[cu] : null,
                 scope: Number.isFinite(scope) && scope > 0 ? scope : null,
-                fraction: Number.isFinite(fraction) && fraction >= 0 && fraction <= 1 ? fraction : null });
+                fraction: Number.isFinite(fraction) && fraction >= 0 && fraction <= 1 ? fraction : null,
+                mn: cmn >= 0 ? man(row[cmn]) : null, ma: cma >= 0 ? man(row[cma]) : null });
             }
             sourceRows[key] = records;
           }
-          const aliases = {
-            "false ceiling - ground floor": "ground floor", "false ceiling - first floor": "first floor",
-            "false ceiling - second floor": "second floor", "false ceiling - third floor": "third floor",
-            "lift lobby": "lift lobby", "over head tank": "over head tank"
+          // Dashboard name -> [sheet name, occurrence] for rows the sheet names differently / repeats.
+          const ALIAS = {
+            opd: {
+              "Lift \u2013 2 No.s": ["2 No.s", 0], "Lift \u2013 3 No.s": ["3 No.s", 0],
+              "Lift \u2013 1 No.": ["1 No.", 0], "Lift \u2013 1 No. (2)": ["1 No.", 1],
+              "False Ceiling \u2013 Ground Floor": ["Ground Floor", 0], "False Ceiling \u2013 First Floor": ["First Floor", 0],
+              "False Ceiling \u2013 Second Floor": ["Second Floor", 0], "False Ceiling \u2013 Third Floor": ["Third Floor", 0],
+            },
+            emr: {
+              "Ground Floor ( 2 Nos.) \u2013 Civil Work": ["Civil Work", 0], "Ground Floor ( 2 Nos.) \u2013 OT Works": ["OT Works", 0],
+              "Lift \u2013 2nd Floor (2 Nos.) \u2013 Civil Work": ["Civil Work", 1], "Lift \u2013 2nd Floor (2 Nos.) \u2013 OT Works": ["OT Works", 1],
+              "Lift \u2013 3rd Floor (12 Nos.) \u2013 Civil Work": ["Civil Work", 2], "Lift \u2013 3rd Floor (12 Nos.) \u2013 OT Works": ["OT Works", 2],
+              "CSSD Room \u2013 Civil Work": ["Civil Work", 3], "CSSD Room \u2013 Service Oriented Work": ["Service Oriented Work", 0],
+              "Lift \u2013 2 Nos.": ["2 Nos.", 0], "Lift \u2013 1 Nos.": ["1 Nos.", 0],
+              "Lift \u2013 2 Nos. (2)": ["2 Nos.", 1], "Lift \u2013 2 Nos. (3)": ["2 Nos.", 2], "Lift \u2013 2 Nos. (4)": ["2 Nos.", 3],
+              "Lift \u2013 2 Nos. (Dumb waiter)": ["2 Nos. (Dumb waiter)", 0],
+              "Lift lobby": ["Lift lobby", 0], "Over Head Tank": ["Over Head Tank", 0],
+            },
           };
           for (const key of ["opd", "emr"]) {
             const available = sourceRows[key].slice();
             const used = new Set();
+            const alias = {};
+            for (const n in ALIAS[key]) alias[normalizeActivity(n)] = [normalizeActivity(ALIAS[key][n][0]), ALIAS[key][n][1]];
             for (const activity of D[key].rows) {
               const canonical = normalizeActivity(activity.n);
-              let candidates = [canonical, aliases[canonical]].filter(Boolean);
-              // “(2)” in the original dashboard identifies a later occurrence of the same named activity.
-              const duplicate = canonical.match(/^(.*) \((\d+)\)$/);
-              if (duplicate) candidates = [duplicate[1]];
               let matchIndex = -1;
-              for (const candidate of candidates) {
-                const matches = available.map((r, i) => ({ r, i })).filter(x => x.r.key === candidate && !used.has(x.i));
-                if (matches.length) {
-                  const desiredOccurrence = duplicate ? Number(duplicate[2]) - 1 : 0;
-                  const chosen = matches[Math.min(desiredOccurrence, matches.length - 1)];
-                  matchIndex = chosen.i; break;
-                }
+              if (alias[canonical]) {
+                const [k, o] = alias[canonical];
+                const hits = available.map((r, i) => i).filter((i) => available[i].key === k);
+                if (hits[o] != null) matchIndex = hits[o];
+              } else {
+                // “(2)” identifies a later occurrence of the same named activity.
+                const duplicate = canonical.match(/^(.*) \((\d+)\)$/);
+                const k = duplicate ? duplicate[1] : canonical;
+                const hits = available.map((r, i) => i).filter((i) => available[i].key === k && !used.has(i));
+                if (hits.length) matchIndex = hits[Math.min(duplicate ? Number(duplicate[2]) - 1 : 0, hits.length - 1)];
               }
-              if (matchIndex < 0) continue;
+              if (matchIndex < 0) { console.warn("No sheet row for", key, activity.n); continue; }
               used.add(matchIndex);
               const source = available[matchIndex];
-              // Update only source fields. Original dashboard formulas and activity list stay unchanged.
               if (source.scope != null) activity.sc = source.scope;
               if (source.fraction != null && activity.sc > 0) activity.d = activity.sc * source.fraction;
               if (source.start) activity.s = source.start;
               if (source.end) activity.e = source.end;
+              if (source.mn != null) activity.mn = source.mn;
+              if (source.ma != null) activity.ma = source.ma;
             }
           }
           try { const saved = localStorage.getItem("dailyProgressLG"); if (saved) Object.assign(LG, JSON.parse(saved)); } catch (e) {}
